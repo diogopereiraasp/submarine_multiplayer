@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Submarine Game</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="layout">
+      <div id="gameWrap">
+        <canvas id="game"></canvas>
+      </div>
+
+      <div id="hud">
+        <h3>Jogadores conectados</h3>
+        <ul id="ids"></ul>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
