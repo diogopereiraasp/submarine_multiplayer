@@ -1,10 +1,10 @@
-export function setupInput(canvas, game, socket) {
+export function setupInput(canvas, game, renderer) {
   canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
 
+    const { x, y } = renderer.screenToWorld(screenX, screenY);
     game.setMoveTarget(x, y);
-    socket.emit("move_to", { x, y });
   });
 }
