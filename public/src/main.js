@@ -6,7 +6,7 @@ import { WORLD } from "./config/world.js";
 
 const canvas = document.getElementById("game");
 const renderer = createRenderer(canvas, {
-  backgroundColor: "#211832",
+  backgroundColor: "#1A1A1D",
   world: WORLD,
 });
 

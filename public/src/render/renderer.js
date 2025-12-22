@@ -1,5 +1,6 @@
 import { drawPlayer } from "./draw/player.js";
 import { createCamera } from "./camera.js";
+import { createFpsMeter } from "./fps.js";
 
 function hexToRgb(hex) {
   if (!hex || typeof hex !== "string") return null;
@@ -25,6 +26,7 @@ function mixWithWhite({ r, g, b }, t) {
 export function createRenderer(canvas, { backgroundColor, world }) {
   const ctx = canvas.getContext("2d");
   const camera = createCamera({ world, viewWidth: world.viewWidth });
+  const fpsMeter = createFpsMeter({ sampleMs: 500 });
 
   const baseRgb = hexToRgb(backgroundColor) ?? { r: 255, g: 255, b: 255 };
   const gridRgb = mixWithWhite(baseRgb, 0.12); // levemente mais claro que o fundo
@@ -89,6 +91,8 @@ export function createRenderer(canvas, { backgroundColor, world }) {
     },
 
     drawGame(game) {
+      fpsMeter.update(performance.now());
+
       const me = game.getMyPlayer();
       if (me) {
         camera.update({
@@ -122,6 +126,9 @@ export function createRenderer(canvas, { backgroundColor, world }) {
 
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      // ✅ FPS no canto superior direito do canvas
+      fpsMeter.draw(ctx, canvas);
     },
   };
 }
