@@ -11,6 +11,9 @@ export function createGame({ myColor, otherColor, world }) {
   const players = new Map(); // id -> player
   const localPlayer = createPlayer({ x: 100, y: 100, color: myColor });
 
+  // ✅ efeitos locais (não sincroniza por rede)
+  const clickEffects = [];
+
   function ensureOtherPlayer(id, idx = 0) {
     if (players.has(id)) return players.get(id);
 
@@ -74,13 +77,35 @@ export function createGame({ myColor, otherColor, world }) {
       return { x: localPlayer.x, y: localPlayer.y };
     },
 
+    // ✅ adiciona feedback de clique (local)
+    addClickFeedback(x, y) {
+      clickEffects.push({
+        x,
+        y,
+        age: 0,
+        ttl: 0.35, // segundos (fade rápido)
+        radius: 14, // em unidades do mundo
+      });
+    },
+
+    getClickEffects() {
+      return clickEffects;
+    },
+
     update(dt) {
       localPlayer.update(dt);
 
-      // ✅ não usar setPosition aqui (senão cancela target e anda "um passo")
+      // clamp do player local sem cancelar o target
       const maxX = world.width - localPlayer.size;
       const maxY = world.height - localPlayer.size;
       localPlayer.clampPosition(0, 0, maxX, maxY);
+
+      // update efeitos
+      for (let i = clickEffects.length - 1; i >= 0; i--) {
+        const fx = clickEffects[i];
+        fx.age += dt;
+        if (fx.age >= fx.ttl) clickEffects.splice(i, 1);
+      }
     },
 
     getRenderablePlayers() {

@@ -1,6 +1,7 @@
 import { drawPlayer } from "./draw/player.js";
 import { createCamera } from "./camera.js";
 import { createFpsMeter } from "./fps.js";
+import { drawClickFeedback } from "./draw/clickFeedback.js";
 
 function hexToRgb(hex) {
   if (!hex || typeof hex !== "string") return null;
@@ -29,7 +30,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
   const fpsMeter = createFpsMeter({ sampleMs: 500 });
 
   const baseRgb = hexToRgb(backgroundColor) ?? { r: 255, g: 255, b: 255 };
-  const gridRgb = mixWithWhite(baseRgb, 0.12); // levemente mais claro que o fundo
+  const gridRgb = mixWithWhite(baseRgb, 0.12);
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -78,12 +79,28 @@ export function createRenderer(canvas, { backgroundColor, world }) {
     ctx.stroke();
   }
 
+  function drawOverlay({ originX, originY, viewportPx, pingMs }) {
+    const fps = Math.round(fpsMeter.getFps());
+    const pingText = pingMs == null ? "--" : `${Math.round(pingMs)}ms`;
+    const text = `${fps} FPS  ${pingText}`;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    ctx.font = "10px system-ui, Arial, sans-serif";
+    ctx.textBaseline = "top";
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+
+    ctx.fillText(text, originX + viewportPx - 8, originY + 8);
+    ctx.restore();
+  }
+
   return {
     getCamera() {
       return camera;
     },
 
-    // ✅ agora considera viewport quadrado centralizado
     screenToWorld(screenX, screenY) {
       const { viewportPx, originX, originY } = getViewport();
 
@@ -102,12 +119,11 @@ export function createRenderer(canvas, { backgroundColor, world }) {
     },
 
     clear() {
-      // fundo do canvas inteiro
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     },
 
-    drawGame(game) {
+    drawGame(game, { pingMs } = {}) {
       fpsMeter.update(performance.now());
 
       const { viewportPx, originX, originY } = getViewport();
@@ -127,7 +143,6 @@ export function createRenderer(canvas, { backgroundColor, world }) {
         });
       }
 
-      // ✅ desenha o mundo dentro do viewport quadrado (letterbox fora)
       ctx.save();
       ctx.beginPath();
       ctx.rect(originX, originY, viewportPx, viewportPx);
@@ -144,6 +159,21 @@ export function createRenderer(canvas, { backgroundColor, world }) {
 
       drawGrid();
 
+      // ✅ feedback de clique local (sutil, fadeout rápido)
+      const clickEffects = game.getClickEffects?.() ?? [];
+      const myColor = me?.color ?? "rgba(255,255,255,0.35)";
+      clickEffects.forEach((fx) => {
+        drawClickFeedback(ctx, {
+          x: fx.x,
+          y: fx.y,
+          age: fx.age,
+          ttl: fx.ttl,
+          radius: fx.radius,
+          color: myColor,
+          thickness: 2 / camera.scale,
+        });
+      });
+
       ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.lineWidth = 4 / camera.scale;
       ctx.strokeRect(0, 0, world.width, world.height);
@@ -154,8 +184,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      // ✅ FPS no canto superior direito DO viewport (não do canvas inteiro)
-      fpsMeter.draw(ctx, { x: originX + viewportPx - 8, y: originY + 8 });
+      drawOverlay({ originX, originY, viewportPx, pingMs });
     },
   };
 }

@@ -7,6 +7,10 @@ export function setupInput(canvas, game, renderer) {
     const worldPos = renderer.screenToWorld(screenX, screenY);
     if (!worldPos) return;
 
+    // ✅ feedback visual local (cada jogador vê apenas o próprio clique)
+    game.addClickFeedback(worldPos.x, worldPos.y);
+
+    // movimento
     game.setMoveTarget(worldPos.x, worldPos.y);
   });
 }

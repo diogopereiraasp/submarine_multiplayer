@@ -14,20 +14,9 @@ export function createFpsMeter({ sampleMs = 500 } = {}) {
     }
   }
 
-  function draw(ctx, { x, y } = { x: 0, y: 0 }) {
-    const text = `${Math.round(fps)} FPS`;
-
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    ctx.font = "10px system-ui, Arial, sans-serif";
-    ctx.textBaseline = "top";
-    ctx.textAlign = "right";
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-
-    ctx.fillText(text, x, y);
-    ctx.restore();
+  function getFps() {
+    return fps;
   }
 
-  return { update, draw };
+  return { update, getFps };
 }
