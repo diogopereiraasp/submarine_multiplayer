@@ -5,6 +5,7 @@ import { setupInput } from "./input/mouse.js";
 import { WORLD } from "./config/world.js";
 
 const canvas = document.getElementById("game");
+
 const renderer = createRenderer(canvas, {
   backgroundColor: "#1A1A1D",
   world: WORLD,

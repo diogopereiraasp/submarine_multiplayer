@@ -79,10 +79,9 @@ export function createRenderer(canvas, { backgroundColor, world }) {
     ctx.stroke();
   }
 
-  function drawOverlay({ originX, originY, viewportPx, pingMs }) {
+  function drawOverlay({ originX, originY, viewportPx }) {
     const fps = Math.round(fpsMeter.getFps());
-    const pingText = pingMs == null ? "--" : `${Math.round(pingMs)}ms`;
-    const text = `${fps} FPS  ${pingText}`;
+    const text = `${fps} FPS`;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -107,7 +106,12 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       const localX = screenX - originX;
       const localY = screenY - originY;
 
-      if (localX < 0 || localY < 0 || localX > viewportPx || localY > viewportPx) {
+      if (
+        localX < 0 ||
+        localY < 0 ||
+        localX > viewportPx ||
+        localY > viewportPx
+      ) {
         return null;
       }
 
@@ -123,7 +127,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     },
 
-    drawGame(game, { pingMs } = {}) {
+    drawGame(game) {
       fpsMeter.update(performance.now());
 
       const { viewportPx, originX, originY } = getViewport();
@@ -159,7 +163,6 @@ export function createRenderer(canvas, { backgroundColor, world }) {
 
       drawGrid();
 
-      // ✅ feedback de clique local (sutil, fadeout rápido)
       const clickEffects = game.getClickEffects?.() ?? [];
       const myColor = me?.color ?? "rgba(255,255,255,0.35)";
       clickEffects.forEach((fx) => {
@@ -184,7 +187,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      drawOverlay({ originX, originY, viewportPx, pingMs });
+      drawOverlay({ originX, originY, viewportPx });
     },
   };
 }

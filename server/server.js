@@ -20,7 +20,7 @@ const io = new Server(server, {
 app.use(express.static(publicDir));
 
 const connectedIds = new Set();
-const playerPositions = new Map(); // id -> { x, y }
+const playerPositions = new Map();
 
 function broadcastConnectedIds() {
   io.emit("connected_ids", Array.from(connectedIds));
@@ -28,7 +28,6 @@ function broadcastConnectedIds() {
 
 io.on("connection", (socket) => {
   connectedIds.add(socket.id);
-  console.log("✅ connected:", socket.id);
 
   socket.emit(
     "players_state",
@@ -49,7 +48,6 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     connectedIds.delete(socket.id);
     playerPositions.delete(socket.id);
-    console.log("❌ disconnected:", socket.id);
     broadcastConnectedIds();
   });
 });
@@ -68,7 +66,6 @@ const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
   console.log(`🚀 http://localhost:${PORT}`);
-
   const ip = getLocalIPv4();
   if (ip) console.log(`🌐 http://${ip}:${PORT}`);
 });
