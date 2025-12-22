@@ -1,7 +1,11 @@
 import { createGameLoop } from "./loop.js";
 import { createPlayer } from "../entities/player.js";
 
-export function createGame({ myColor, otherColor }) {
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+export function createGame({ myColor, otherColor, world }) {
   let myId = null;
 
   const players = new Map(); // id -> player
@@ -38,6 +42,10 @@ export function createGame({ myColor, otherColor }) {
   const loop = createGameLoop((payload) => onFrame?.(payload));
 
   return {
+    getMyPlayer() {
+      return localPlayer;
+    },
+
     setMyId(id) {
       myId = id;
     },
@@ -47,15 +55,18 @@ export function createGame({ myColor, otherColor }) {
     },
 
     setMoveTarget(x, y) {
-      localPlayer.setTarget(x, y);
+      const maxX = world.width - localPlayer.size;
+      const maxY = world.height - localPlayer.size;
+      localPlayer.setTarget(clamp(x, 0, maxX), clamp(y, 0, maxY));
     },
 
-    // usado para atualizar posição em tempo real (recebido via socket)
     setPlayerPosition(id, x, y) {
       if (id === myId) return;
 
       const other = ensureOtherPlayer(id);
-      other.setPosition(x, y); // posição instantânea
+      const maxX = world.width - other.size;
+      const maxY = world.height - other.size;
+      other.setPosition(clamp(x, 0, maxX), clamp(y, 0, maxY));
     },
 
     getMyPosition() {
@@ -65,7 +76,11 @@ export function createGame({ myColor, otherColor }) {
 
     update(dt) {
       localPlayer.update(dt);
-      // outros players agora recebem posição pronta, não precisam de update
+
+      // ✅ não usar setPosition aqui (senão cancela target e anda "um passo")
+      const maxX = world.width - localPlayer.size;
+      const maxY = world.height - localPlayer.size;
+      localPlayer.clampPosition(0, 0, maxX, maxY);
     },
 
     getRenderablePlayers() {

@@ -20,11 +20,20 @@ export function createPlayer({ x, y, color }) {
       state.targetY = y;
     },
 
+    // usado para sincronização em tempo real (teleporta e fixa o target)
     setPosition(x, y) {
       state.x = x;
       state.y = y;
       state.targetX = x;
       state.targetY = y;
+    },
+
+    // ✅ clampa posição sem cancelar o movimento atual
+    clampPosition(minX, minY, maxX, maxY) {
+      if (state.x < minX) state.x = minX;
+      if (state.y < minY) state.y = minY;
+      if (state.x > maxX) state.x = maxX;
+      if (state.y > maxY) state.y = maxY;
     },
 
     update(dt) {
