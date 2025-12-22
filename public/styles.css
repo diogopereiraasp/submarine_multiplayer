@@ -3,6 +3,7 @@ body {
   padding: 16px;
   margin: 0;
   background: #0b0b0e;
+  color: #fff;
 }
 
 code {
@@ -13,21 +14,22 @@ code {
 }
 
 ul { margin: 6px 0 0; padding-left: 16px; }
-.muted { opacity: .8; font-size: 12px; }
 
 #layout {
   display: flex;
-  align-items: stretch;
   gap: 12px;
-  height: 80vh;
+  align-items: stretch;
 }
 
+/* ✅ viewport do jogo sempre quadrado */
 #gameWrap {
-  flex: 1;
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 10px;
   overflow: hidden;
-  height: 100%;
+
+  height: 80vh;
+  aspect-ratio: 1 / 1;   /* força quadrado */
+  flex: 0 0 auto;
 }
 
 #game {
@@ -37,15 +39,13 @@ ul { margin: 6px 0 0; padding-left: 16px; }
 }
 
 #hud {
-  height: 100%;
+  height: 80vh; /* mesma altura do gameWrap */
   align-self: stretch;
 
   display: flex;
   flex-direction: column;
 
-  /* mais escuro que o canvas (#44444E) */
-  background: #2f2f36;
-
+  background: rgba(20, 20, 28, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
 
@@ -63,4 +63,25 @@ ul { margin: 6px 0 0; padding-left: 16px; }
   flex: 1;
   overflow: auto;
   margin: 0;
+}
+
+/* ✅ mobile: empilha, mantendo o canvas quadrado e usável */
+@media (max-width: 768px) {
+  #layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #gameWrap {
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    aspect-ratio: 1 / 1;
+  }
+
+  #hud {
+    width: 100%;
+    height: auto;
+    max-height: 35vh;
+  }
 }

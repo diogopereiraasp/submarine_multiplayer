@@ -4,9 +4,10 @@ function clamp(v, min, max) {
 
 export function createCamera({ world, viewWidth }) {
   const state = {
-    x: 0,
-    y: 0,
+    x: world.width / 2,
+    y: world.height / 2,
     scale: 1,
+
     viewWidth,
     viewHeight: viewWidth,
     baseViewWidth: viewWidth,
@@ -29,11 +30,11 @@ export function createCamera({ world, viewWidth }) {
       return state.viewHeight;
     },
 
-    update({ targetX, targetY, canvasWidth, canvasHeight }) {
-      // mesma área de mundo na horizontal, independente do tamanho do canvas
+    // ✅ câmera sempre quadrada (mesma área para todo mundo)
+    update({ targetX, targetY, viewportPx }) {
       state.viewWidth = state.baseViewWidth;
-      state.viewHeight = state.viewWidth * (canvasHeight / canvasWidth);
-      state.scale = canvasWidth / state.viewWidth;
+      state.viewHeight = state.baseViewWidth; // quadrado
+      state.scale = viewportPx / state.viewWidth;
 
       const halfW = state.viewWidth / 2;
       const halfH = state.viewHeight / 2;
@@ -43,7 +44,6 @@ export function createCamera({ world, viewWidth }) {
       const minY = halfH;
       const maxY = world.height - halfH;
 
-      // se o mapa for menor que a view, centraliza
       const centerX = world.width / 2;
       const centerY = world.height / 2;
 
@@ -51,15 +51,15 @@ export function createCamera({ world, viewWidth }) {
       state.y = world.height <= state.viewHeight ? centerY : clamp(targetY, minY, maxY);
     },
 
-    screenToWorld({ screenX, screenY, canvasWidth, canvasHeight }) {
+    screenToWorld({ screenX, screenY, viewportPx }) {
       const viewW = state.viewWidth;
       const viewH = state.viewHeight;
 
       const worldLeft = state.x - viewW / 2;
       const worldTop = state.y - viewH / 2;
 
-      const worldX = worldLeft + (screenX / canvasWidth) * viewW;
-      const worldY = worldTop + (screenY / canvasHeight) * viewH;
+      const worldX = worldLeft + (screenX / viewportPx) * viewW;
+      const worldY = worldTop + (screenY / viewportPx) * viewH;
 
       return { x: worldX, y: worldY };
     },

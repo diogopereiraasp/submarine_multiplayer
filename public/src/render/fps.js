@@ -14,11 +14,10 @@ export function createFpsMeter({ sampleMs = 500 } = {}) {
     }
   }
 
-  function draw(ctx, canvas) {
+  function draw(ctx, { x, y } = { x: 0, y: 0 }) {
     const text = `${Math.round(fps)} FPS`;
 
     ctx.save();
-    // desenha em coordenadas de tela (não mexe no grid/câmera)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.font = "10px system-ui, Arial, sans-serif";
@@ -26,7 +25,7 @@ export function createFpsMeter({ sampleMs = 500 } = {}) {
     ctx.textAlign = "right";
     ctx.fillStyle = "rgba(255,255,255,0.45)";
 
-    ctx.fillText(text, canvas.width - 8, 8);
+    ctx.fillText(text, x, y);
     ctx.restore();
   }
 

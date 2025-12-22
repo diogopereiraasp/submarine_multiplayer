@@ -40,6 +40,13 @@ export function createRenderer(canvas, { backgroundColor, world }) {
   window.addEventListener("resize", resize);
   resize();
 
+  function getViewport() {
+    const viewportPx = Math.min(canvas.width, canvas.height);
+    const originX = Math.floor((canvas.width - viewportPx) / 2);
+    const originY = Math.floor((canvas.height - viewportPx) / 2);
+    return { viewportPx, originX, originY };
+  }
+
   function drawGrid() {
     const gridSize = world.gridSize ?? 100;
 
@@ -56,18 +63,18 @@ export function createRenderer(canvas, { backgroundColor, world }) {
     ctx.strokeStyle = `rgba(${gridRgb.r},${gridRgb.g},${gridRgb.b},0.28)`;
     ctx.lineWidth = 1 / camera.scale;
 
-    // linhas verticais
     ctx.beginPath();
+
     for (let x = startX; x <= endX; x += gridSize) {
       ctx.moveTo(x, startY);
       ctx.lineTo(x, endY);
     }
 
-    // linhas horizontais
     for (let y = startY; y <= endY; y += gridSize) {
       ctx.moveTo(startX, y);
       ctx.lineTo(endX, y);
     }
+
     ctx.stroke();
   }
 
@@ -76,16 +83,26 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       return camera;
     },
 
+    // ✅ agora considera viewport quadrado centralizado
     screenToWorld(screenX, screenY) {
+      const { viewportPx, originX, originY } = getViewport();
+
+      const localX = screenX - originX;
+      const localY = screenY - originY;
+
+      if (localX < 0 || localY < 0 || localX > viewportPx || localY > viewportPx) {
+        return null;
+      }
+
       return camera.screenToWorld({
-        screenX,
-        screenY,
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
+        screenX: localX,
+        screenY: localY,
+        viewportPx,
       });
     },
 
     clear() {
+      // fundo do canvas inteiro
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     },
@@ -93,30 +110,40 @@ export function createRenderer(canvas, { backgroundColor, world }) {
     drawGame(game) {
       fpsMeter.update(performance.now());
 
-      const me = game.getMyPlayer();
+      const { viewportPx, originX, originY } = getViewport();
+
+      const me = game.getMyPlayer?.();
       if (me) {
         camera.update({
           targetX: me.x + me.size / 2,
           targetY: me.y + me.size / 2,
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
+          viewportPx,
+        });
+      } else {
+        camera.update({
+          targetX: world.width / 2,
+          targetY: world.height / 2,
+          viewportPx,
         });
       }
 
+      // ✅ desenha o mundo dentro do viewport quadrado (letterbox fora)
       ctx.save();
+      ctx.beginPath();
+      ctx.rect(originX, originY, viewportPx, viewportPx);
+      ctx.clip();
+
       ctx.setTransform(
         camera.scale,
         0,
         0,
         camera.scale,
-        canvas.width / 2 - camera.x * camera.scale,
-        canvas.height / 2 - camera.y * camera.scale
+        originX + viewportPx / 2 - camera.x * camera.scale,
+        originY + viewportPx / 2 - camera.y * camera.scale
       );
 
-      // ✅ malha (linhas verticais/horizontais)
       drawGrid();
 
-      // limites do mapa
       ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.lineWidth = 4 / camera.scale;
       ctx.strokeRect(0, 0, world.width, world.height);
@@ -127,8 +154,8 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      // ✅ FPS no canto superior direito do canvas
-      fpsMeter.draw(ctx, canvas);
+      // ✅ FPS no canto superior direito DO viewport (não do canvas inteiro)
+      fpsMeter.draw(ctx, { x: originX + viewportPx - 8, y: originY + 8 });
     },
   };
 }
