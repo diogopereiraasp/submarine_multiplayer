@@ -195,7 +195,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
           x: w.x,
           y: w.y,
           radius: w.radius,
-          alpha: alpha * 0.28,
+          alpha: alpha * 0.15,
           thickness: 2 / camera.scale,
         });
       });

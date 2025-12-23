@@ -1,6 +1,6 @@
 export const WORLD = {
-  width: 5000,
-  height: 5000,
+  width: 1200,
+  height: 1200,
 
   // área visível (mundo) na horizontal. Mantém mesma “câmera lógica” em qualquer tela.
   viewWidth: 1200,
@@ -11,9 +11,9 @@ export const WORLD = {
   // ✅ SONAR (necessário pro game + renderer)
   sonar: {
     // raio máximo do pulso (unidades do mundo)
-    maxRadius: 1800,
+    maxRadius: 500,
     // velocidade (unidades do mundo por segundo)
-    speed: 900,
+    speed: 500,
     // emite automaticamente enquanto move (intervalo mínimo)
     emitEvery: 0.35,
   },
