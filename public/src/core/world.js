@@ -11,10 +11,10 @@ export const WORLD = {
   // ✅ SONAR (necessário pro game + renderer)
   sonar: {
     // raio máximo do pulso (unidades do mundo)
-    maxRadius: 500,
+    maxRadius: 500, //1800
     // velocidade (unidades do mundo por segundo)
-    speed: 500,
+    speed: 500, //900
     // emite automaticamente enquanto move (intervalo mínimo)
-    emitEvery: 0.35,
+    emitEvery: 0.35, //0.35
   },
 };
