@@ -1,9 +1,6 @@
 import { createGameLoop } from "./loop.js";
 import { createPlayer } from "../entities/player.js";
-
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
-}
+import { clamp } from "../utils/math.js";
 
 export function createGame({ myColor, otherColor, world }) {
   let myId = null;
@@ -11,22 +8,40 @@ export function createGame({ myColor, otherColor, world }) {
   const players = new Map(); // id -> player
   const localPlayer = createPlayer({ x: 100, y: 100, color: myColor });
 
-  // ✅ efeitos locais (não sincroniza por rede)
+  // efeitos locais
   const clickEffects = [];
 
-  // ✅ sonar local (ondas só do jogador)
+  // ===== SONAR (ondas locais + envio server) =====
   const sonarWaves = []; // { x, y, age }
-  const sonarOutbox = []; // { x, y } para enviar ao server
+  const sonarOutbox = []; // { x, y }
   let sonarCooldown = 0;
 
-  // ✅ indicadores de direção (overlay)
+  // indicadores (direção)
   const sonarIndicators = []; // { angle, age, ttl, kind }
 
+  function getSonarConfig() {
+    const cfg = world?.sonar ?? {};
+    return {
+      maxRadius: typeof cfg.maxRadius === "number" ? cfg.maxRadius : 1800,
+      speed: typeof cfg.speed === "number" ? cfg.speed : 900,
+      emitEvery: typeof cfg.emitEvery === "number" ? cfg.emitEvery : 0.35,
+    };
+  }
+
   function ensurePlayer(id) {
-    if (id === myId) return null;
+    if (!id || id === myId) return null;
+
     if (!players.has(id)) {
-      players.set(id, createPlayer({ x: 200, y: 200, color: otherColor }));
+      players.set(
+        id,
+        createPlayer({
+          x: 200,
+          y: 200,
+          color: otherColor,
+        })
+      );
     }
+
     return players.get(id);
   }
 
@@ -58,22 +73,43 @@ export function createGame({ myColor, otherColor, world }) {
 
     setPlayerPosition(id, x, y) {
       if (!id || id === myId) return;
+
       const p = ensurePlayer(id);
       if (!p) return;
-      p.setPosition(x, y);
+
+      if (typeof p.setPosition === "function") {
+        p.setPosition(x, y);
+        return;
+      }
+
+      // fallback (evita quebrar caso player seja diferente)
+      try {
+        p.x = x;
+        p.y = y;
+      } catch {
+        // noop
+      }
     },
 
     setMoveTarget(x, y) {
       const tx = clamp(x, 0, world.width - localPlayer.size);
       const ty = clamp(y, 0, world.height - localPlayer.size);
-      localPlayer.setTarget(tx, ty);
+
+      if (typeof localPlayer.setTarget === "function") {
+        localPlayer.setTarget(tx, ty);
+        return;
+      }
+
+      localPlayer.targetX = tx;
+      localPlayer.targetY = ty;
+      localPlayer.moving = true;
     },
 
     getMyPosition() {
       return { x: localPlayer.x, y: localPlayer.y };
     },
 
-    // ===== CLICK FEEDBACK (necessário pro mouse.js) =====
+    // ===== CLICK FEEDBACK (mantém compatibilidade com mouse.js) =====
     addClickFeedback(x, y) {
       clickEffects.push({
         x,
@@ -88,7 +124,7 @@ export function createGame({ myColor, otherColor, world }) {
       return clickEffects;
     },
 
-    // ===== SONAR =====
+    // ===== SONAR API =====
     consumeSonarOutbox() {
       const batch = sonarOutbox.slice();
       sonarOutbox.length = 0;
@@ -96,11 +132,12 @@ export function createGame({ myColor, otherColor, world }) {
     },
 
     getSonarWaves() {
+      const { speed, maxRadius } = getSonarConfig();
       return sonarWaves.map((w) => ({
         x: w.x,
         y: w.y,
-        radius: w.age * world.sonar.speed,
-        maxRadius: world.sonar.maxRadius,
+        radius: w.age * speed,
+        maxRadius,
       }));
     },
 
@@ -119,16 +156,23 @@ export function createGame({ myColor, otherColor, world }) {
     },
 
     update(dt) {
-      // movimento local
       const prevX = localPlayer.x;
       const prevY = localPlayer.y;
 
-      localPlayer.update(dt);
+      // atualiza movimento do player (preserva implementação do player.js)
+      if (typeof localPlayer.update === "function") {
+        localPlayer.update(dt);
+      }
 
-      // auto sonar enquanto move
+      // detectar movimento real (pra emitir sonar enquanto move)
       const moved = Math.hypot(localPlayer.x - prevX, localPlayer.y - prevY);
 
+      const { emitEvery, speed, maxRadius } = getSonarConfig();
+
+      // cooldown
       sonarCooldown -= dt;
+
+      // emite sonar automaticamente enquanto move
       if (moved > 0.05 && sonarCooldown <= 0) {
         const ox = localPlayer.x + localPlayer.size / 2;
         const oy = localPlayer.y + localPlayer.size / 2;
@@ -136,16 +180,14 @@ export function createGame({ myColor, otherColor, world }) {
         sonarWaves.push({ x: ox, y: oy, age: 0 });
         sonarOutbox.push({ x: ox, y: oy });
 
-        sonarCooldown = world.sonar.emitEvery;
+        sonarCooldown = emitEvery;
       }
 
-      // ondas
+      // ondas locais: aumenta age e remove ao atingir maxRadius
       for (let i = sonarWaves.length - 1; i >= 0; i--) {
         const w = sonarWaves[i];
         w.age += dt;
-        if (w.age * world.sonar.speed >= world.sonar.maxRadius) {
-          sonarWaves.splice(i, 1);
-        }
+        if (w.age * speed >= maxRadius) sonarWaves.splice(i, 1);
       }
 
       // indicadores

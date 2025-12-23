@@ -1,8 +1,9 @@
 import { createRenderer } from "./render/renderer.js";
-import { createGame } from "./game/game.js";
+import { createGame } from "./core/game.js";
+import { WORLD } from "./core/world.js";
 import { setupHud } from "./ui/hud.js";
 import { setupInput } from "./input/mouse.js";
-import { WORLD } from "./config/world.js";
+import { createSocketClient } from "./net/socketClient.js";
 
 const canvas = document.getElementById("game");
 
@@ -17,30 +18,25 @@ const game = createGame({
   world: WORLD,
 });
 
-const socket = io();
+const net = createSocketClient({
+  onConnectId: (id) => game.setMyId(id),
+  onConnectedIds: (ids) => game.setConnectedIds(ids),
+  onPlayersState: (list) => {
+    list.forEach(({ id, x, y }) => {
+      game.setPlayerPosition(id, x, y);
+    });
+  },
+  onPlayerState: ({ id, x, y }) => {
+    game.setPlayerPosition(id, x, y);
+  },
+  onSonarHit: (payload) => game.onSonarHit(payload),
+  onSonarConfirm: (payload) => game.onSonarConfirm(payload),
+});
 
-setupHud(socket, {
+// HUD continua usando o socket real para listar IDs (sem mexer no funcionamento)
+setupHud(net.raw(), {
   onMyId: (id) => game.setMyId(id),
   onIds: (ids) => game.setConnectedIds(ids),
-});
-
-socket.on("players_state", (list) => {
-  list.forEach(({ id, x, y }) => {
-    game.setPlayerPosition(id, x, y);
-  });
-});
-
-socket.on("player_state", ({ id, x, y }) => {
-  game.setPlayerPosition(id, x, y);
-});
-
-// ===== SONAR EVENTS =====
-socket.on("sonar_hit", (payload) => {
-  game.onSonarHit(payload);
-});
-
-socket.on("sonar_confirm", (payload) => {
-  game.onSonarConfirm(payload);
 });
 
 setupInput(canvas, game, renderer);
@@ -49,11 +45,10 @@ game.start(({ dt }) => {
   game.update(dt);
 
   const myPos = game.getMyPosition();
-  if (myPos) socket.emit("player_state", myPos);
+  if (myPos) net.sendPlayerState(myPos);
 
-  // envia pulsos emitidos automaticamente enquanto move
   game.consumeSonarOutbox().forEach((p) => {
-    socket.emit("sonar_emit", p);
+    net.emitSonar(p);
   });
 
   renderer.clear();
