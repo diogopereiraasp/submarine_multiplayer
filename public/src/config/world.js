@@ -9,4 +9,13 @@ export const WORLD = {
   // Tamanho da malha (em unidades do mundo). Fácil de ajustar.
   // (Na prática, 1 unidade do mundo == 1px quando scale=1)
   gridSize: 100,
+
+  sonar: {
+    // raio máximo do pulso (em unidades do mundo)
+    maxRadius: 1800,
+    // velocidade do pulso (unidades do mundo por segundo)
+    speed: 900,
+    // emite automaticamente enquanto move (intervalo mínimo)
+    emitEvery: 0.35,
+  },
 };

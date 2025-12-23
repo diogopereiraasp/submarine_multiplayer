@@ -14,26 +14,25 @@ export function createGame({ myColor, otherColor, world }) {
   // ✅ efeitos locais (não sincroniza por rede)
   const clickEffects = [];
 
-  function ensureOtherPlayer(id, idx = 0) {
-    if (players.has(id)) return players.get(id);
+  // ✅ sonar local (ondas só do jogador)
+  const sonarWaves = []; // { x, y, age }
+  const sonarOutbox = []; // { x, y } para enviar ao server
+  let sonarCooldown = 0;
 
-    const col = idx % 10;
-    const row = Math.floor(idx / 10);
+  // ✅ indicadores de direção (overlay)
+  const sonarIndicators = []; // { angle, age, ttl, kind }
 
-    const p = createPlayer({
-      x: 50 + col * 60,
-      y: 50 + row * 60,
-      color: otherColor,
-    });
-
-    players.set(id, p);
-    return p;
+  function ensurePlayer(id) {
+    if (id === myId) return null;
+    if (!players.has(id)) {
+      players.set(id, createPlayer({ x: 200, y: 200, color: otherColor }));
+    }
+    return players.get(id);
   }
 
-  function ensurePlayersFromIds(ids) {
-    ids.forEach((id, idx) => {
-      if (id === myId) return;
-      ensureOtherPlayer(id, idx);
+  function applyConnectedIds(ids) {
+    ids.forEach((id) => {
+      if (id !== myId) ensurePlayer(id);
     });
 
     for (const id of Array.from(players.keys())) {
@@ -54,37 +53,34 @@ export function createGame({ myColor, otherColor, world }) {
     },
 
     setConnectedIds(ids) {
-      ensurePlayersFromIds(ids);
-    },
-
-    setMoveTarget(x, y) {
-      const maxX = world.width - localPlayer.size;
-      const maxY = world.height - localPlayer.size;
-      localPlayer.setTarget(clamp(x, 0, maxX), clamp(y, 0, maxY));
+      applyConnectedIds(ids);
     },
 
     setPlayerPosition(id, x, y) {
-      if (id === myId) return;
+      if (!id || id === myId) return;
+      const p = ensurePlayer(id);
+      if (!p) return;
+      p.setPosition(x, y);
+    },
 
-      const other = ensureOtherPlayer(id);
-      const maxX = world.width - other.size;
-      const maxY = world.height - other.size;
-      other.setPosition(clamp(x, 0, maxX), clamp(y, 0, maxY));
+    setMoveTarget(x, y) {
+      const tx = clamp(x, 0, world.width - localPlayer.size);
+      const ty = clamp(y, 0, world.height - localPlayer.size);
+      localPlayer.setTarget(tx, ty);
     },
 
     getMyPosition() {
-      if (!myId) return null;
       return { x: localPlayer.x, y: localPlayer.y };
     },
 
-    // ✅ adiciona feedback de clique (local)
+    // ===== CLICK FEEDBACK (necessário pro mouse.js) =====
     addClickFeedback(x, y) {
       clickEffects.push({
         x,
         y,
         age: 0,
-        ttl: 0.35, // segundos (fade rápido)
-        radius: 14, // em unidades do mundo
+        ttl: 0.35,
+        radius: 14,
       });
     },
 
@@ -92,15 +88,74 @@ export function createGame({ myColor, otherColor, world }) {
       return clickEffects;
     },
 
+    // ===== SONAR =====
+    consumeSonarOutbox() {
+      const batch = sonarOutbox.slice();
+      sonarOutbox.length = 0;
+      return batch;
+    },
+
+    getSonarWaves() {
+      return sonarWaves.map((w) => ({
+        x: w.x,
+        y: w.y,
+        radius: w.age * world.sonar.speed,
+        maxRadius: world.sonar.maxRadius,
+      }));
+    },
+
+    onSonarHit({ angle }) {
+      if (typeof angle !== "number") return;
+      sonarIndicators.push({ angle, age: 0, ttl: 0.9, kind: "hit" });
+    },
+
+    onSonarConfirm({ angle }) {
+      if (typeof angle !== "number") return;
+      sonarIndicators.push({ angle, age: 0, ttl: 0.6, kind: "confirm" });
+    },
+
+    getSonarIndicators() {
+      return sonarIndicators;
+    },
+
     update(dt) {
+      // movimento local
+      const prevX = localPlayer.x;
+      const prevY = localPlayer.y;
+
       localPlayer.update(dt);
 
-      // clamp do player local sem cancelar o target
-      const maxX = world.width - localPlayer.size;
-      const maxY = world.height - localPlayer.size;
-      localPlayer.clampPosition(0, 0, maxX, maxY);
+      // auto sonar enquanto move
+      const moved = Math.hypot(localPlayer.x - prevX, localPlayer.y - prevY);
 
-      // update efeitos
+      sonarCooldown -= dt;
+      if (moved > 0.05 && sonarCooldown <= 0) {
+        const ox = localPlayer.x + localPlayer.size / 2;
+        const oy = localPlayer.y + localPlayer.size / 2;
+
+        sonarWaves.push({ x: ox, y: oy, age: 0 });
+        sonarOutbox.push({ x: ox, y: oy });
+
+        sonarCooldown = world.sonar.emitEvery;
+      }
+
+      // ondas
+      for (let i = sonarWaves.length - 1; i >= 0; i--) {
+        const w = sonarWaves[i];
+        w.age += dt;
+        if (w.age * world.sonar.speed >= world.sonar.maxRadius) {
+          sonarWaves.splice(i, 1);
+        }
+      }
+
+      // indicadores
+      for (let i = sonarIndicators.length - 1; i >= 0; i--) {
+        const it = sonarIndicators[i];
+        it.age += dt;
+        if (it.age >= it.ttl) sonarIndicators.splice(i, 1);
+      }
+
+      // click feedback
       for (let i = clickEffects.length - 1; i >= 0; i--) {
         const fx = clickEffects[i];
         fx.age += dt;

@@ -24,8 +24,23 @@ setupHud(socket, {
   onIds: (ids) => game.setConnectedIds(ids),
 });
 
+socket.on("players_state", (list) => {
+  list.forEach(({ id, x, y }) => {
+    game.setPlayerPosition(id, x, y);
+  });
+});
+
 socket.on("player_state", ({ id, x, y }) => {
   game.setPlayerPosition(id, x, y);
+});
+
+// ===== SONAR EVENTS =====
+socket.on("sonar_hit", (payload) => {
+  game.onSonarHit(payload);
+});
+
+socket.on("sonar_confirm", (payload) => {
+  game.onSonarConfirm(payload);
 });
 
 setupInput(canvas, game, renderer);
@@ -35,6 +50,11 @@ game.start(({ dt }) => {
 
   const myPos = game.getMyPosition();
   if (myPos) socket.emit("player_state", myPos);
+
+  // envia pulsos emitidos automaticamente enquanto move
+  game.consumeSonarOutbox().forEach((p) => {
+    socket.emit("sonar_emit", p);
+  });
 
   renderer.clear();
   renderer.drawGame(game);

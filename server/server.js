@@ -29,6 +29,10 @@ function broadcastConnectedIds() {
 io.on("connection", (socket) => {
   connectedIds.add(socket.id);
 
+  if (!playerPositions.has(socket.id)) {
+    playerPositions.set(socket.id, { x: 100, y: 100 });
+  }
+
   socket.emit(
     "players_state",
     Array.from(playerPositions.entries()).map(([id, pos]) => ({
@@ -43,6 +47,39 @@ io.on("connection", (socket) => {
   socket.on("player_state", ({ x, y }) => {
     playerPositions.set(socket.id, { x, y });
     socket.broadcast.emit("player_state", { id: socket.id, x, y });
+  });
+
+  // ===== SONAR =====
+  socket.on("sonar_emit", ({ x, y }) => {
+    const origin = playerPositions.get(socket.id);
+    if (!origin) return;
+
+    const maxRadius = 1800;
+    const speed = 900;
+
+    for (const [targetId, targetPos] of playerPositions.entries()) {
+      if (targetId === socket.id) continue;
+
+      const dx = targetPos.x - x;
+      const dy = targetPos.y - y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxRadius) continue;
+
+      const delayMs = (dist / speed) * 1000;
+
+      // Direção do emissor -> alvo
+      const angleToTarget = Math.atan2(dy, dx);
+
+      setTimeout(() => {
+        if (!connectedIds.has(targetId)) return;
+
+        // ✅ Alvo recebe direção de onde veio (alvo -> emissor)
+        io.to(targetId).emit("sonar_hit", { angle: angleToTarget + Math.PI });
+
+        // ✅ Emissor recebe confirmação apontando para o alvo (emissor -> alvo)
+        io.to(socket.id).emit("sonar_confirm", { angle: angleToTarget });
+      }, delayMs);
+    }
   });
 
   socket.on("disconnect", () => {
