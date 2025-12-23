@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
+import { WORLD } from "../public/src/core/world.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,20 @@ const playerPositions = new Map();
 
 function broadcastConnectedIds() {
   io.emit("connected_ids", Array.from(connectedIds));
+}
+
+function getSonarConfig() {
+  const s = WORLD?.sonar ?? {};
+  const detectRadius =
+    typeof s.detectRadius === "number"
+      ? s.detectRadius
+      : typeof s.maxRadius === "number"
+      ? s.maxRadius
+      : 1800;
+
+  const speed = typeof s.speed === "number" ? s.speed : 900;
+
+  return { detectRadius, speed };
 }
 
 io.on("connection", (socket) => {
@@ -54,8 +69,7 @@ io.on("connection", (socket) => {
     const origin = playerPositions.get(socket.id);
     if (!origin) return;
 
-    const maxRadius = 1800;
-    const speed = 900;
+    const { detectRadius, speed } = getSonarConfig();
 
     for (const [targetId, targetPos] of playerPositions.entries()) {
       if (targetId === socket.id) continue;
@@ -63,20 +77,20 @@ io.on("connection", (socket) => {
       const dx = targetPos.x - x;
       const dy = targetPos.y - y;
       const dist = Math.hypot(dx, dy);
-      if (dist > maxRadius) continue;
+
+      // ✅ usa WORLD.sonar.detectRadius
+      if (dist > detectRadius) continue;
 
       const delayMs = (dist / speed) * 1000;
-
-      // Direção do emissor -> alvo
       const angleToTarget = Math.atan2(dy, dx);
 
       setTimeout(() => {
         if (!connectedIds.has(targetId)) return;
 
-        // ✅ Alvo recebe direção de onde veio (alvo -> emissor)
+        // alvo recebe direção de onde veio (alvo -> emissor)
         io.to(targetId).emit("sonar_hit", { angle: angleToTarget + Math.PI });
 
-        // ✅ Emissor recebe confirmação apontando para o alvo (emissor -> alvo)
+        // emissor recebe confirmação (emissor -> alvo)
         io.to(socket.id).emit("sonar_confirm", { angle: angleToTarget });
       }, delayMs);
     }

@@ -10,8 +10,10 @@ export const WORLD = {
 
   // ✅ SONAR (necessário pro game + renderer)
   sonar: {
+    // ✅ distância que o sonar IDENTIFICA outro player (alcance de detecção/colisão no servidor)
+    detectRadius: 800, //500
     // raio máximo do pulso (unidades do mundo)
-    maxRadius: 500, //1800
+    maxRadius: 800, //1800
     // velocidade (unidades do mundo por segundo)
     speed: 500, //900
     // emite automaticamente enquanto move (intervalo mínimo)
