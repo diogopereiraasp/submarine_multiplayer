@@ -4,6 +4,7 @@ import { createFpsMeter } from "./fps.js";
 import { drawClickFeedback } from "./draw/clickFeedback.js";
 import { drawSonarWave } from "./draw/sonarWave.js";
 import { drawSonarIndicator } from "./draw/sonarIndicator.js";
+import { CONFIG } from "../core/config.js";
 
 function hexToRgb(hex) {
   if (!hex || typeof hex !== "string") return null;
@@ -82,6 +83,8 @@ export function createRenderer(canvas, { backgroundColor, world }) {
   }
 
   function drawOverlay({ originX, originY, viewportPx }) {
+    if (CONFIG.visuals?.fps?.enabled === false) return;
+
     const fps = Math.round(fpsMeter.getFps?.() ?? 0);
     const text = `${fps} FPS`;
 
@@ -184,7 +187,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
         originY + viewportPx / 2 - camera.y * camera.scale
       );
 
-      drawGrid();
+      if (CONFIG.visuals?.grid?.enabled !== false) drawGrid();
 
       // SONAR (ondas locais apenas)
       const waves = game.getSonarWaves?.() ?? [];
@@ -209,7 +212,7 @@ export function createRenderer(canvas, { backgroundColor, world }) {
           age: fx.age,
           ttl: fx.ttl,
           radius: fx.radius,
-          color: me?.color ?? "rgba(255,255,255,0.35)",
+          color: me?.color ?? "#D2C1B6",
           thickness: 2 / camera.scale,
         });
       });
@@ -218,14 +221,14 @@ export function createRenderer(canvas, { backgroundColor, world }) {
       ctx.lineWidth = 4 / camera.scale;
       ctx.strokeRect(0, 0, world.width, world.height);
 
-      const players = game.getRenderablePlayers?.() ?? [];
+      const players = game.getRenderablePlayers();
       players.forEach((p) => drawPlayer(ctx, p));
 
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      drawOverlay({ originX, originY, viewportPx });
       drawSonarIndicatorsOverlay(game, { originX, originY, viewportPx });
+      drawOverlay({ originX, originY, viewportPx });
     },
   };
 }

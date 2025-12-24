@@ -1,21 +1,21 @@
 import { createRenderer } from "./render/renderer.js";
 import { createGame } from "./core/game.js";
-import { WORLD } from "./core/world.js";
 import { setupHud } from "./ui/hud.js";
 import { setupInput } from "./input/mouse.js";
 import { createSocketClient } from "./net/socketClient.js";
+import { CONFIG } from "./core/config.js";
 
 const canvas = document.getElementById("game");
 
 const renderer = createRenderer(canvas, {
-  backgroundColor: "#1A1A1D",
-  world: WORLD,
+  backgroundColor: CONFIG.visuals.backgroundColor,
+  world: CONFIG.world,
 });
 
 const game = createGame({
-  myColor: "#D2C1B6",
-  otherColor: "#948979",
-  world: WORLD,
+  myColor: CONFIG.visuals.players.myColor,
+  otherColor: CONFIG.visuals.players.otherColor,
+  world: CONFIG.world,
 });
 
 const net = createSocketClient({
