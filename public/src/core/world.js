@@ -1,22 +1,24 @@
+const magicValue = 1280;
+
 export const WORLD = {
-  width: 1200,
-  height: 1200,
+  width: magicValue * 2,
+  height: magicValue * 2,
 
   // área visível (mundo) na horizontal. Mantém mesma “câmera lógica” em qualquer tela.
-  viewWidth: 1200,
+  viewWidth: magicValue,
 
   // grid do mapa
-  gridSize: 100,
+  gridSize: magicValue / 10,
 
   // ✅ SONAR (necessário pro game + renderer)
   sonar: {
     // ✅ distância que o sonar IDENTIFICA outro player (alcance de detecção/colisão no servidor)
-    detectRadius: 800, //500
+    detectRadius: magicValue, //500
     // raio máximo do pulso (unidades do mundo)
-    maxRadius: 800, //1800
+    maxRadius: magicValue, //1800
     // velocidade (unidades do mundo por segundo)
-    speed: 500, //900
+    speed: magicValue / 2, //900
     // emite automaticamente enquanto move (intervalo mínimo)
-    emitEvery: 0.35, //0.35
+    emitEvery: 0.5, //0.35
   },
 };

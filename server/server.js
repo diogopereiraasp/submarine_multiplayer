@@ -21,13 +21,7 @@ const io = new Server(server, {
 app.use(express.static(publicDir));
 
 const connectedIds = new Set();
-const playerPositions = new Map();
-
-/**
- * Mantém em sync com o tamanho do player no client (entities/player.js).
- * Se você mudar o size lá, ajuste aqui também.
- */
-const PLAYER_SIZE = 30;
+const playerPositions = new Map(); // id -> {x,y}
 
 function broadcastConnectedIds() {
   io.emit("connected_ids", Array.from(connectedIds));
@@ -47,48 +41,45 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function pickSpawnPosition() {
-  const width = WORLD?.width ?? 1200;
-  const height = WORLD?.height ?? 1200;
+function spawnPositionAvoidingOthers() {
+  const padding = 30;
+  const minX = padding;
+  const minY = padding;
+  const maxX = Math.max(padding, WORLD.width - padding);
+  const maxY = Math.max(padding, WORLD.height - padding);
 
-  const maxX = Math.max(0, width - PLAYER_SIZE);
-  const maxY = Math.max(0, height - PLAYER_SIZE);
+  // usa detectRadius como “zona de segurança” para não nascer colado
+  const detect = WORLD?.sonar?.detectRadius ?? 0;
+  const safeDist = Math.max(60, Math.min(220, detect * 0.35)); // mantém comportamento estável
 
-  // distância mínima entre centros (evita nascer em cima/colado)
-  const minDist = Math.max(PLAYER_SIZE * 3, 90);
-  const tries = 120;
-
-  for (let i = 0; i < tries; i++) {
-    const x = randInt(0, maxX);
-    const y = randInt(0, maxY);
-
-    const cx = x + PLAYER_SIZE / 2;
-    const cy = y + PLAYER_SIZE / 2;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const x = randInt(minX, maxX);
+    const y = randInt(minY, maxY);
 
     let ok = true;
-    for (const pos of playerPositions.values()) {
-      const pcx = pos.x + PLAYER_SIZE / 2;
-      const pcy = pos.y + PLAYER_SIZE / 2;
-      if (Math.hypot(pcx - cx, pcy - cy) < minDist) {
+    for (const [, p] of playerPositions.entries()) {
+      const dx = p.x - x;
+      const dy = p.y - y;
+      if (Math.hypot(dx, dy) < safeDist) {
         ok = false;
         break;
       }
     }
-
     if (ok) return { x, y };
   }
 
-  // fallback: mapa cheio
-  return { x: randInt(0, maxX), y: randInt(0, maxY) };
+  return { x: randInt(minX, maxX), y: randInt(minY, maxY) };
 }
 
 io.on("connection", (socket) => {
   connectedIds.add(socket.id);
 
-  // ✅ spawn aleatório sem colidir
-  playerPositions.set(socket.id, pickSpawnPosition());
+  const spawn = spawnPositionAvoidingOthers();
+  playerPositions.set(socket.id, spawn);
 
-  // snapshot inicial (inclui o próprio id)
+  broadcastConnectedIds();
+
+  // manda estado completo para quem entrou
   socket.emit(
     "players_state",
     Array.from(playerPositions.entries()).map(([id, pos]) => ({
@@ -98,7 +89,8 @@ io.on("connection", (socket) => {
     }))
   );
 
-  broadcastConnectedIds();
+  // manda apenas o novo para os outros
+  socket.broadcast.emit("player_state", { id: socket.id, x: spawn.x, y: spawn.y });
 
   socket.on("player_state", ({ x, y }) => {
     playerPositions.set(socket.id, { x, y });
@@ -110,17 +102,27 @@ io.on("connection", (socket) => {
     const origin = playerPositions.get(socket.id);
     if (!origin) return;
 
-    const maxRadius = 1800;
-    const speed = 900;
+    const sonarCfg = WORLD?.sonar ?? {};
+    const maxRadius = typeof sonarCfg.maxRadius === "number" ? sonarCfg.maxRadius : 1800;
+    const speed = typeof sonarCfg.speed === "number" ? sonarCfg.speed : 900;
+    const detectRadius =
+      typeof sonarCfg.detectRadius === "number" ? sonarCfg.detectRadius : maxRadius;
+
+    // usa a posição do servidor como fonte de verdade
+    const ox = origin.x;
+    const oy = origin.y;
 
     for (const [targetId, targetPos] of playerPositions.entries()) {
       if (targetId === socket.id) continue;
 
-      const dx = targetPos.x - x;
-      const dy = targetPos.y - y;
+      const dx = targetPos.x - ox;
+      const dy = targetPos.y - oy;
       const dist = Math.hypot(dx, dy);
-      if (dist > maxRadius) continue;
 
+      // ✅ detectRadius controla quem é "identificado" (gera indicador)
+      if (dist > detectRadius) continue;
+
+      // delay proporcional à distância, como se a onda viajasse no mapa
       const delayMs = (dist / speed) * 1000;
       const angleToTarget = Math.atan2(dy, dx);
 
