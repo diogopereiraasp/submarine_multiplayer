@@ -33,7 +33,6 @@ const net = createSocketClient({
   onSonarConfirm: (payload) => game.onSonarConfirm(payload),
 });
 
-// HUD continua usando o socket real para listar IDs (sem mexer no funcionamento)
 setupHud(net.raw(), {
   onMyId: (id) => game.setMyId(id),
   onIds: (ids) => game.setConnectedIds(ids),
@@ -45,7 +44,7 @@ game.start(({ dt }) => {
   game.update(dt);
 
   const myPos = game.getMyPosition();
-  if (myPos) net.sendPlayerState(myPos);
+  if (myPos && game.isSpawned?.()) net.sendPlayerState(myPos);
 
   game.consumeSonarOutbox().forEach((p) => {
     net.emitSonar(p);

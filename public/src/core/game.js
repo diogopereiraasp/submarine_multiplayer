@@ -1,28 +1,63 @@
 import { createGameLoop } from "./loop.js";
 import { createPlayer } from "../entities/player.js";
 import { clamp } from "../utils/math.js";
-import { createPlayersStore } from "./playersStore.js";
-import { createSonarSystem } from "./sonarSystem.js";
-import { createEffects } from "./effects.js";
 
 export function createGame({ myColor, otherColor, world }) {
   let myId = null;
+  let hasServerSpawn = false;
 
+  const players = new Map(); // id -> player
   const localPlayer = createPlayer({ x: 100, y: 100, color: myColor });
 
-  const remotes = createPlayersStore({ otherColor });
-  const sonar = createSonarSystem(world);
-  const effects = createEffects();
+  // efeitos locais
+  const clickEffects = [];
+
+  // ===== SONAR (ondas locais + envio server) =====
+  const sonarWaves = []; // { x, y, age }
+  const sonarOutbox = []; // { x, y }
+  let sonarCooldown = 0;
+
+  // indicadores (direção)
+  const sonarIndicators = []; // { angle, age, ttl, kind }
+
+  function getSonarConfig() {
+    const cfg = world?.sonar ?? {};
+    return {
+      maxRadius: typeof cfg.maxRadius === "number" ? cfg.maxRadius : 1800,
+      speed: typeof cfg.speed === "number" ? cfg.speed : 900,
+      emitEvery: typeof cfg.emitEvery === "number" ? cfg.emitEvery : 0.35,
+    };
+  }
+
+  function ensurePlayer(id) {
+    if (id === myId) return null;
+
+    if (!players.has(id)) {
+      players.set(
+        id,
+        createPlayer({
+          x: 200,
+          y: 200,
+          color: otherColor,
+        })
+      );
+    }
+
+    return players.get(id);
+  }
+
+  function applyConnectedIds(ids) {
+    ids.forEach((id) => {
+      if (id !== myId) ensurePlayer(id);
+    });
+
+    for (const id of Array.from(players.keys())) {
+      if (!ids.includes(id)) players.delete(id);
+    }
+  }
 
   let onFrame = null;
   const loop = createGameLoop((payload) => onFrame?.(payload));
-
-  function getCenter() {
-    return {
-      cx: localPlayer.x + localPlayer.size / 2,
-      cy: localPlayer.y + localPlayer.size / 2,
-    };
-  }
 
   return {
     getMyPlayer() {
@@ -34,11 +69,44 @@ export function createGame({ myColor, otherColor, world }) {
     },
 
     setConnectedIds(ids) {
-      remotes.setConnectedIds(ids, myId);
+      applyConnectedIds(ids);
     },
 
     setPlayerPosition(id, x, y) {
-      remotes.setPlayerPosition(id, myId, x, y);
+      if (!id) return;
+
+      // aplica spawn inicial do próprio player vindo do servidor (apenas 1x)
+      if (id === myId && !hasServerSpawn) {
+        if (typeof localPlayer.setPosition === "function") {
+          localPlayer.setPosition(x, y);
+        } else {
+          try {
+            localPlayer.x = x;
+            localPlayer.y = y;
+          } catch {
+            // noop
+          }
+        }
+        hasServerSpawn = true;
+        return;
+      }
+
+      if (id === myId) return;
+
+      const p = ensurePlayer(id);
+      if (!p) return;
+
+      if (typeof p.setPosition === "function") {
+        p.setPosition(x, y);
+        return;
+      }
+
+      try {
+        p.x = x;
+        p.y = y;
+      } catch {
+        // noop
+      }
     },
 
     setMoveTarget(x, y) {
@@ -47,43 +115,66 @@ export function createGame({ myColor, otherColor, world }) {
 
       if (typeof localPlayer.setTarget === "function") {
         localPlayer.setTarget(tx, ty);
-      } else {
-        localPlayer.targetX = tx;
-        localPlayer.targetY = ty;
-        localPlayer.moving = true;
+        return;
       }
-    },
 
-    addClickFeedback(x, y) {
-      effects.add(x, y);
-    },
-
-    getClickEffects() {
-      return effects.list();
-    },
-
-    consumeSonarOutbox() {
-      return sonar.consumeOutbox();
-    },
-
-    getSonarWaves() {
-      return sonar.getWaves();
-    },
-
-    onSonarHit(payload) {
-      sonar.onHit(payload);
-    },
-
-    onSonarConfirm(payload) {
-      sonar.onConfirm(payload);
-    },
-
-    getSonarIndicators() {
-      return sonar.getIndicators();
+      localPlayer.targetX = tx;
+      localPlayer.targetY = ty;
+      localPlayer.moving = true;
     },
 
     getMyPosition() {
       return { x: localPlayer.x, y: localPlayer.y };
+    },
+
+    isSpawned() {
+      return hasServerSpawn;
+    },
+
+    // ===== CLICK FEEDBACK (mantém compatibilidade com mouse.js) =====
+    addClickFeedback(x, y) {
+      clickEffects.push({
+        x,
+        y,
+        age: 0,
+        ttl: 0.35,
+        radius: 14,
+      });
+    },
+
+    getClickEffects() {
+      return clickEffects;
+    },
+
+    // ===== SONAR API =====
+    consumeSonarOutbox() {
+      const batch = sonarOutbox.slice();
+      sonarOutbox.length = 0;
+      return batch;
+    },
+
+    getSonarWaves() {
+      const { speed, maxRadius } = getSonarConfig();
+      return sonarWaves.map((w) => ({
+        x: w.x,
+        y: w.y,
+        radius: w.age * speed,
+        maxRadius,
+      }));
+    },
+
+    onSonarHit({ angle }) {
+      if (typeof angle !== "number") return;
+      sonarIndicators.push({ angle, age: 0, ttl: 0.9, kind: "hit" });
+    },
+
+    onSonarConfirm({ angle }) {
+      if (typeof angle !== "number") return;
+      sonarIndicators.push({ angle, age: 0, ttl: 0.6, kind: "confirm" });
+    },
+
+    getSonarIndicators() {
+      return sonarIndicators;
     },
 
     update(dt) {
@@ -95,14 +186,41 @@ export function createGame({ myColor, otherColor, world }) {
       }
 
       const moved = Math.hypot(localPlayer.x - prevX, localPlayer.y - prevY);
-      const { cx, cy } = getCenter();
+      const { emitEvery, speed, maxRadius } = getSonarConfig();
 
-      sonar.update(dt, moved, cx, cy);
-      effects.update(dt);
+      sonarCooldown -= dt;
+
+      if (moved > 0.05 && sonarCooldown <= 0) {
+        const ox = localPlayer.x + localPlayer.size / 2;
+        const oy = localPlayer.y + localPlayer.size / 2;
+
+        sonarWaves.push({ x: ox, y: oy, age: 0 });
+        sonarOutbox.push({ x: ox, y: oy });
+
+        sonarCooldown = emitEvery;
+      }
+
+      for (let i = sonarWaves.length - 1; i >= 0; i--) {
+        const w = sonarWaves[i];
+        w.age += dt;
+        if (w.age * speed >= maxRadius) sonarWaves.splice(i, 1);
+      }
+
+      for (let i = sonarIndicators.length - 1; i >= 0; i--) {
+        const it = sonarIndicators[i];
+        it.age += dt;
+        if (it.age >= it.ttl) sonarIndicators.splice(i, 1);
+      }
+
+      for (let i = clickEffects.length - 1; i >= 0; i--) {
+        const fx = clickEffects[i];
+        fx.age += dt;
+        if (fx.age >= fx.ttl) clickEffects.splice(i, 1);
+      }
     },
 
     getRenderablePlayers() {
-      return [localPlayer, ...remotes.list()];
+      return [localPlayer, ...Array.from(players.values())];
     },
 
     start(frameCallback) {
