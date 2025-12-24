@@ -5,7 +5,7 @@ import { WORLD } from "./world.js";
 export const CONFIG = {
   // ===== Compat (não remover sem refatorar o jogo)
   // true = mostra adversários / false = adversários invisíveis
-  showOtherPlayers: true,
+  showOtherPlayers: false,
 
   // ===== Mundo (referência ao WORLD atual)
   world: WORLD,
