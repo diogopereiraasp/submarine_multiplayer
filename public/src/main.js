@@ -1,6 +1,5 @@
 import { createRenderer } from "./render/renderer.js";
 import { createGame } from "./core/game.js";
-import { setupHud } from "./ui/hud.js";
 import { setupInput } from "./input/mouse.js";
 import { createSocketClient } from "./net/socketClient.js";
 import { CONFIG } from "./core/config.js";
@@ -31,11 +30,6 @@ const net = createSocketClient({
   },
   onSonarHit: (payload) => game.onSonarHit(payload),
   onSonarConfirm: (payload) => game.onSonarConfirm(payload),
-});
-
-setupHud(net.raw(), {
-  onMyId: (id) => game.setMyId(id),
-  onIds: (ids) => game.setConnectedIds(ids),
 });
 
 setupInput(canvas, game, renderer);
