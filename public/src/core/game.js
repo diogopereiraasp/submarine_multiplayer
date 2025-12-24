@@ -1,6 +1,7 @@
 import { createGameLoop } from "./loop.js";
 import { createPlayer } from "../entities/player.js";
 import { clamp } from "../utils/math.js";
+import { CONFIG } from "./config.js";
 
 export function createGame({ myColor, otherColor, world }) {
   let myId = null;
@@ -131,7 +132,7 @@ export function createGame({ myColor, otherColor, world }) {
       return hasServerSpawn;
     },
 
-    // ===== CLICK FEEDBACK (mantém compatibilidade com mouse.js) =====
+    // ===== CLICK FEEDBACK =====
     addClickFeedback(x, y) {
       clickEffects.push({
         x,
@@ -146,7 +147,7 @@ export function createGame({ myColor, otherColor, world }) {
       return clickEffects;
     },
 
-    // ===== SONAR API =====
+    // ===== SONAR =====
     consumeSonarOutbox() {
       const batch = sonarOutbox.slice();
       sonarOutbox.length = 0;
@@ -220,6 +221,7 @@ export function createGame({ myColor, otherColor, world }) {
     },
 
     getRenderablePlayers() {
+      if (!CONFIG.showOtherPlayers) return [localPlayer];
       return [localPlayer, ...Array.from(players.values())];
     },
 
