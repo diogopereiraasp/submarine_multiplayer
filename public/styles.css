@@ -10,7 +10,7 @@
 body {
   font-family: system-ui, Arial, sans-serif;
   margin: 0;
-  padding: 18px;
+  padding: 0;
   color: #fff;
 
   background:
@@ -25,17 +25,17 @@ body {
 }
 
 #app {
-  width: 100%;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Canvas centralizado, sempre quadrado e responsivo */
+/* Sem padding: canvas ocupa o maior quadrado possível da tela */
 #gameWrap {
-  width: min(92vw, 860px);
-  aspect-ratio: 1 / 1;
-  max-height: 86vh;
+  width: min(100vw, 100vh);
+  height: min(100vw, 100vh);
 
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
@@ -51,12 +51,18 @@ body {
   display: block;
 }
 
-/* Mobile: mantém área confortável sem quebrar o layout */
+/* Mobile: respeita safe-area sem criar “área clicável inútil” */
 @media (max-width: 768px) {
-  body { padding: 14px; }
+  #app {
+    padding:
+      env(safe-area-inset-top)
+      env(safe-area-inset-right)
+      env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
 
   #gameWrap {
-    width: 96vw;
-    max-height: 78vh;
+    width: min(100vw, 100vh);
+    height: min(100vw, 100vh);
   }
 }
